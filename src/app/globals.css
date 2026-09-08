@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  --color-navy: #14304f;
+  --color-navy-light: #24507e;
+  --color-navy-dark: #0c2038;
+  --color-paper: #f6f7f5;
+  --color-ink: #1c2430;
+  --color-ink-soft: #4a5568;
+  --color-accent: #a9721f;
+  --color-accent-light: #c99a4f;
+  --color-success: #1f7a4d;
+  --color-success-bg: #e7f5ec;
+  --color-warning: #b45309;
+  --color-warning-bg: #fdf1e3;
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fbeaea;
+  --color-border: #dde3ea;
+  --color-card: #ffffff;
+}
+
+@theme inline {
+  --color-navy: var(--color-navy);
+  --color-navy-light: var(--color-navy-light);
+  --color-navy-dark: var(--color-navy-dark);
+  --color-paper: var(--color-paper);
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+  --color-success: var(--color-success);
+  --color-success-bg: var(--color-success-bg);
+  --color-warning: var(--color-warning);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-danger: var(--color-danger);
+  --color-danger-bg: var(--color-danger-bg);
+  --color-border: var(--color-border);
+  --color-card: var(--color-card);
+  --font-sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+::selection {
+  background: var(--color-accent-light);
+  color: var(--color-navy-dark);
+}
+
+/* Thin custom scrollbar for the horizontal date strip and tables */
+.thin-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
