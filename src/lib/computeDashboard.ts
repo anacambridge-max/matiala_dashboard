@@ -1,5 +1,4 @@
 import hearingDataRaw from "@/data/hearing_data.json";
-import hearingScheduleRaw from "@/data/hearing_schedule.json";
 import psMasterRaw from "@/data/ps_master.json";
 import type {
   EciDataset,
@@ -11,11 +10,6 @@ import type {
 import { buildEciLookup } from "./eciParser";
 
 const hearingData = hearingDataRaw as unknown as HearingDataRow[];
-const hearingSchedule = hearingScheduleRaw as unknown as {
-  Date: string;
-  "PS No.": number;
-  "Scheduled Notices for Hearing": number;
-}[];
 const psMaster = psMasterRaw as unknown as PsMasterRow[];
 
 function toStr(v: unknown): string {
@@ -100,11 +94,11 @@ for (const row of psMaster) {
   MASTER_BY_PS.set(row["PS No."], row);
 }
 
-// The uploaded Part-wise Hearing Summary is now the authoritative schedule.
-// Dates are derived from the uploaded schedule itself, so future dates added
-// to the sheet automatically appear in the dashboard without manual editing.
+// The current hearing_data.json is the dashboard's imported PS/date schedule.
+// Deriving dates from it means newly added hearing dates automatically appear
+// in the dashboard when the schedule database is refreshed.
 export const HEARING_DATES = Array.from(
-  new Set(hearingSchedule.map((r) => r.Date))
+  new Set(hearingData.map((r) => r.Date))
 ).sort();
 
 export interface DashboardResult {
@@ -122,11 +116,11 @@ export function computeDashboard(
     ? buildEciLookup(eciDataset)
     : new Map<number, { delivered: number; held: number }>();
 
-  const rowsForDate = hearingSchedule.filter((r) => r.Date === selectedDate);
+  const rowsForDate = hearingData.filter((r) => r.Date === selectedDate);
 
   const psDetails: PsDetailRow[] = rowsForDate.map((r) => {
     const psNo = r["PS No."];
-    const master = MASTER_BY_PS.get(psNo) ?? hearingData.find((h) => h["PS No."] === psNo);
+    const master = MASTER_BY_PS.get(psNo) ?? r;
     const live = eciLookup.get(psNo);
     const scheduled = Number(r["Scheduled Notices for Hearing"]) || 0;
     const delivered = live ? live.delivered : 0;
@@ -138,15 +132,15 @@ export function computeDashboard(
     const assignment = getAuthoritativeAssignment(psNo);
 
     return {
-      officer: assignment?.officer ?? master?.Officer ?? "",
-      officerMobile: assignment?.officerMobile ?? toStr(master?.["Officer Mobile"]),
-      hearingCentre: assignment?.hearingCentre ?? master?.["Hearing Centre"] ?? "",
+      officer: assignment?.officer ?? master.Officer ?? "",
+      officerMobile: assignment?.officerMobile ?? toStr(master["Officer Mobile"]),
+      hearingCentre: assignment?.hearingCentre ?? master["Hearing Centre"] ?? "",
       psNo,
-      oldPsNo: master?.["Old PS No."] ?? null,
-      blo: master?.BLO ?? "",
-      bloMobile: toStr(master?.["BLO Mobile"]),
-      supervisor: master?.Supervisor ?? "",
-      supervisorMobile: toStr(master?.["Supervisor Mobile"]),
+      oldPsNo: master["Old PS No."] ?? null,
+      blo: master.BLO ?? "",
+      bloMobile: toStr(master["BLO Mobile"]),
+      supervisor: master.Supervisor ?? "",
+      supervisorMobile: toStr(master["Supervisor Mobile"]),
       scheduledNotices: scheduled,
       noticeGenerated: scheduled,
       noticeDelivered: delivered,
