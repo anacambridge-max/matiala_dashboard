@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --color-navy: #e7edf5;
-  --color-navy-light: #8ea7c3;
-  --color-navy-dark: #f4f7fb;
-  --color-paper: #111827;
-  --color-ink: #e5e7eb;
-  --color-ink-soft: #9ca3af;
-  --color-accent: #d4a24c;
-  --color-accent-light: #6f572f;
-  --color-success: #4ade80;
-  --color-success-bg: #153523;
+  --color-navy: #172235;
+  --color-navy-light: #3b5578;
+  --color-navy-dark: #0a1220;
+  --color-paper: #0b1220;
+  --color-ink: #f1f5f9;
+  --color-ink-soft: #9aa8bc;
+  --color-accent: #d7a93d;
+  --color-accent-light: #f0c967;
+  --color-success: #34d399;
+  --color-success-bg: #0d2d25;
   --color-warning: #fbbf24;
-  --color-warning-bg: #3b2e12;
+  --color-warning-bg: #302711;
   --color-danger: #f87171;
-  --color-danger-bg: #3a1818;
-  --color-border: #2b3647;
-  --color-card: #182231;
+  --color-danger-bg: #35191d;
+  --color-border: #263449;
+  --color-card: #121c2d;
 }
 
 @theme inline {
@@ -42,24 +42,24 @@
 
 html {
   color-scheme: dark;
-  background: var(--color-paper);
+  background: #0b1220;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   font-family: var(--font-sans);
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: #0b1220;
+  color: #f1f5f9;
 }
 
 input {
-  background: var(--color-card);
-  color: var(--color-ink);
+  background: #121c2d;
+  color: #f1f5f9;
 }
 
 input::placeholder {
-  color: var(--color-ink-soft);
+  color: #9aa8bc;
 }
 
 .font-serif {
@@ -67,17 +67,16 @@ input::placeholder {
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: #111827;
+  background: #d7a93d;
+  color: #0a1220;
 }
 
-/* Thin custom scrollbar for the horizontal date strip and tables */
 .thin-scroll::-webkit-scrollbar {
   height: 6px;
   width: 6px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: #34445b;
   border-radius: 999px;
 }
 .thin-scroll::-webkit-scrollbar-track {
