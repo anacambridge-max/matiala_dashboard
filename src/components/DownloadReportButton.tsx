@@ -36,8 +36,12 @@ const HEADER_HEIGHT = 20;
 const SECTION_HEIGHT = 31;
 const FOOTER_Y = 18;
 
+function ascii(value: string) {
+  return String(value ?? "").replace(/[^\x20-\x7E]/g, "?");
+}
+
 function pdfEscape(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  return ascii(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
 function textOp(
@@ -52,24 +56,28 @@ function textOp(
 }
 
 function fitText(value: string, maxChars: number) {
-  const clean = String(value ?? "").replace(/\s+/g, " ").trim();
+  const clean = ascii(String(value ?? "").replace(/\s+/g, " ").trim());
   if (clean.length <= maxChars) return clean;
-  return `${clean.slice(0, Math.max(1, maxChars - 1))}…`;
+  return `${clean.slice(0, Math.max(1, maxChars - 3))}...`;
 }
 
 function makePdf(pageStreams: string[]) {
   const objects: string[] = [];
   objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("<< /Type /Pages /Kids [" + pageStreams.map((_, i) => `${5 + i * 2} 0 R`).join(" ") + `] /Count ${pageStreams.length} >>`);
+  objects.push(
+    "<< /Type /Pages /Kids [" +
+      pageStreams.map((_, i) => `${6 + i * 2} 0 R`).join(" ") +
+      `] /Count ${pageStreams.length} >>`
+  );
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
 
   pageStreams.forEach((stream) => {
     const contentObject = objects.length + 1;
-    const pageObject = contentObject + 1;
     objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObject} 0 R >>`);
-    void pageObject;
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObject} 0 R >>`
+    );
   });
 
   let pdf = "%PDF-1.4\n%\xFF\xFF\xFF\xFF\n";
@@ -154,9 +162,6 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
       let previousOfficer = "";
       let previousCentre = "";
       let index = 0;
-      let totalScheduled = 0;
-      let totalDelivered = 0;
-      let totalPending = 0;
 
       for (const r of pageRows) {
         if (r.officer !== previousOfficer || r.hearingCentre !== previousCentre) {
@@ -186,16 +191,10 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
         ops.push(textOp(String(r.noticeDelivered), col.delivered + 10, baseY, 8, "F2", "0.08 0.42 0.18"));
         const pending = Number(r.noticePendingDelivery ?? 0);
         ops.push(textOp(String(pending), col.pending + 10, baseY, 8.5, "F2", pending > 0 ? "0.72 0.08 0.08" : "0.18 0.45 0.22"));
-
-        totalScheduled += Number(r.scheduledNotices ?? 0);
-        totalDelivered += Number(r.noticeDelivered ?? 0);
-        totalPending += pending;
         index += 1;
         y -= ROW_HEIGHT;
       }
 
-      // Page-level totals are intentionally omitted except on the final page;
-      // the final total is calculated across the complete selected-date dataset.
       if (pageNumber === totalPages) {
         y = Math.max(y, 52);
         ops.push("0.12 0.17 0.23 rg");
@@ -214,7 +213,6 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
       return ops.join("\n");
     };
 
-    // Split by printable row capacity while keeping officer/centre sections together where possible.
     const pages: PsDetailRow[][] = [];
     let current: PsDetailRow[] = [];
     let currentHeight = PAGE_HEIGHT - 135;
@@ -233,7 +231,6 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
     }
     if (current.length) pages.push(current);
 
-    // Ensure the final page has room for the grand total block.
     if (pages.length > 0) {
       const final = pages[pages.length - 1];
       if (final.length > 1 && final.length > 20) {
