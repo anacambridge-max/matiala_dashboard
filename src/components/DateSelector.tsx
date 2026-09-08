@@ -11,7 +11,7 @@ interface Props {
 
 export default function DateSelector({ dates, selected, onSelect, hearingCountByDate }: Props) {
   return (
-    <div className="flex gap-2 overflow-x-auto thin-scroll pb-2 -mx-1 px-1">
+    <div className="flex flex-wrap gap-2 pb-1">
       {dates.map((date) => {
         const { day, date: d, month } = formatDateLabel(date);
         const isActive = date === selected;
@@ -21,7 +21,7 @@ export default function DateSelector({ dates, selected, onSelect, hearingCountBy
             key={date}
             onClick={() => onSelect(date)}
             aria-pressed={isActive}
-            className={`flex flex-col items-center justify-center min-w-[68px] rounded-lg border px-2.5 py-2.5 shrink-0 transition-all ${
+            className={`flex flex-col items-center justify-center w-[68px] rounded-lg border px-2.5 py-2.5 shrink-0 transition-all ${
               isActive
                 ? "bg-accent border-accent text-slate-950 shadow-md shadow-black/20 scale-[1.02]"
                 : "bg-card border-border text-ink hover:border-navy-light hover:bg-navy"
