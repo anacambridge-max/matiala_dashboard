@@ -9,13 +9,28 @@ interface Props {
   hearingCountByDate: Record<string, number>;
 }
 
+const ADDITIONAL_HEARING_DATES = [
+  "2026-10-01",
+  "2026-10-03",
+  "2026-10-05",
+  "2026-10-06",
+];
+
 export default function DateSelector({ dates, selected, onSelect, hearingCountByDate }: Props) {
+  const allDates = Array.from(new Set([...dates, ...ADDITIONAL_HEARING_DATES])).sort();
+  const additionalCounts: Record<string, number> = {
+    "2026-10-01": 7,
+    "2026-10-03": 7,
+    "2026-10-05": 6,
+    "2026-10-06": 3,
+  };
+
   return (
-    <div className="flex flex-wrap gap-2 pb-1">
-      {dates.map((date) => {
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(68px,68px))] gap-2 pb-1">
+      {allDates.map((date) => {
         const { day, date: d, month } = formatDateLabel(date);
         const isActive = date === selected;
-        const count = hearingCountByDate[date] ?? 0;
+        const count = hearingCountByDate[date] ?? additionalCounts[date] ?? 0;
         return (
           <button
             key={date}
