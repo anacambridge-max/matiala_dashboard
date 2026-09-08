@@ -20,9 +20,6 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
         a.psNo - b.psNo
     );
 
-    const label = formatDateLabel(selectedDate);
-    const displayDate = `${label.day} ${label.date} ${label.month}`;
-
     const reportRows = sortedRows.map((r, index) => ({
       "S. No.": index + 1,
       Officer: r.officer,
@@ -43,21 +40,9 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
 
     const worksheet = XLSX.utils.json_to_sheet(reportRows);
     worksheet["!cols"] = [
-      { wch: 7 },
-      { wch: 24 },
-      { wch: 15 },
-      { wch: 38 },
-      { wch: 9 },
-      { wch: 11 },
-      { wch: 28 },
-      { wch: 15 },
-      { wch: 28 },
-      { wch: 17 },
-      { wch: 11 },
-      { wch: 11 },
-      { wch: 11 },
-      { wch: 11 },
-      { wch: 14 },
+      { wch: 7 }, { wch: 24 }, { wch: 15 }, { wch: 38 }, { wch: 9 },
+      { wch: 11 }, { wch: 28 }, { wch: 15 }, { wch: 28 }, { wch: 17 },
+      { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 14 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -68,6 +53,8 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
   }
 
   const disabled = rows.length === 0;
+  const label = formatDateLabel(selectedDate);
+  const displayDate = `${label.day} ${label.date} ${label.month}`;
 
   return (
     <button
