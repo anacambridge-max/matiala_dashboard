@@ -80,7 +80,8 @@ function makePdf(pageStreams: string[]) {
     );
   });
 
-  let pdf = "%PDF-1.4\n%\xFF\xFF\xFF\xFF\n";
+  // Keep the complete PDF ASCII-only so character offsets equal byte offsets.
+  let pdf = "%PDF-1.4\n%PDF\n";
   const offsets: number[] = [0];
   objects.forEach((object, index) => {
     offsets[index + 1] = pdf.length;
@@ -224,6 +225,7 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
         pages.push(current);
         current = [];
         currentHeight = PAGE_HEIGHT - 85;
+        lastSection = "";
       }
       current.push(row);
       currentHeight -= ROW_HEIGHT + extra;
