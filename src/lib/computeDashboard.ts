@@ -15,11 +15,82 @@ const lists = listsRaw as unknown as {
 };
 
 export const HEARING_DATES = lists.dates;
-export const OFFICER_VENUES = lists.officerVenues;
 
 function toStr(v: unknown): string {
   if (v === null || v === undefined) return "";
   return String(v).replace(/\.0$/, "");
+}
+
+/**
+ * AUTHORITATIVE AC-34 hearing allocation.
+ *
+ * The PS-wise allocation is the source of truth for Officer + Hearing Centre.
+ * This intentionally overrides stale/mistyped officer/centre values that may
+ * exist in the schedule snapshot. In particular, PS 123 and PS 340 belong to
+ * SH. RAKESH KUMAR at GCSSC SEC-22 DWARKA(R), not SMT. PARUL GUPTA.
+ */
+const AUTHORITATIVE_PS_ALLOCATION = [
+  {
+    officer: "SH. PARVEEN KUMAR",
+    officerMobile: "9953601073",
+    hearingCentre: "GCSSS, SEC-3 DWARKA(P)",
+    ranges: [[1, 50], [55, 60], [78, 79], [91, 96]],
+  },
+  {
+    officer: "SMT. SHASHI BALA",
+    officerMobile: "9953312984",
+    hearingCentre: "GCSSS, SEC-3 DWARKA(S)",
+    ranges: [[51, 54], [61, 77], [80, 90], [97, 109], [135, 145]],
+  },
+  {
+    officer: "SH. RAKESH KUMAR",
+    officerMobile: "7011971522",
+    hearingCentre: "GCSSC SEC-22 DWARKA(R)",
+    ranges: [[110, 134], [331, 341], [343, 344], [347, 349]],
+  },
+  {
+    officer: "SMT. PARUL GUPTA",
+    officerMobile: "9667881989",
+    hearingCentre: "VREC MATIALA",
+    ranges: [[146, 234], [276, 288]],
+  },
+  {
+    officer: "SH. SUBHASHISH",
+    officerMobile: "9868252144",
+    hearingCentre: "MCD Boys PRIMARY SCHOOL, QUTUB VIHAR",
+    ranges: [[235, 275], [289, 330]],
+  },
+  {
+    officer: "SH. VIRENDER",
+    officerMobile: "9868252144",
+    hearingCentre: "GCSSS SEC 22 DWARKA(V)",
+    ranges: [[342, 342], [345, 346], [350, 374]],
+  },
+  {
+    officer: "SH. VIRENDER",
+    officerMobile: "9868252144",
+    hearingCentre: "GGSSS GHUMANHERA",
+    ranges: [[375, 430]],
+  },
+] as const;
+
+type AuthoritativeAssignment = {
+  officer: string;
+  officerMobile: string;
+  hearingCentre: string;
+};
+
+function getAuthoritativeAssignment(psNo: number): AuthoritativeAssignment | null {
+  for (const allocation of AUTHORITATIVE_PS_ALLOCATION) {
+    if (allocation.ranges.some(([from, to]) => psNo >= from && psNo <= to)) {
+      return {
+        officer: allocation.officer,
+        officerMobile: allocation.officerMobile,
+        hearingCentre: allocation.hearingCentre,
+      };
+    }
+  }
+  return null;
 }
 
 export interface DashboardResult {
@@ -33,7 +104,9 @@ export function computeDashboard(
   selectedDate: string,
   eciDataset: EciDataset | null
 ): DashboardResult {
-  const eciLookup = eciDataset ? buildEciLookup(eciDataset) : new Map<number, { delivered: number; held: number }>();
+  const eciLookup = eciDataset
+    ? buildEciLookup(eciDataset)
+    : new Map<number, { delivered: number; held: number }>();
 
   const rowsForDate = hearingData.filter((r) => r.Date === selectedDate);
 
@@ -44,11 +117,13 @@ export function computeDashboard(
     const delivered = live ? live.delivered : 0;
     const held = live ? live.held : 0;
     const pending = scheduled - delivered;
+    const assignment = getAuthoritativeAssignment(psNo);
 
     return {
-      officer: r.Officer,
-      officerMobile: toStr(r["Officer Mobile"]),
-      hearingCentre: r["Hearing Centre"],
+      // Always use the authoritative PS allocation when one exists.
+      officer: assignment?.officer ?? r.Officer,
+      officerMobile: assignment?.officerMobile ?? toStr(r["Officer Mobile"]),
+      hearingCentre: assignment?.hearingCentre ?? r["Hearing Centre"],
       psNo,
       oldPsNo: r["Old PS No."] ?? null,
       blo: r.BLO ?? "",
@@ -63,22 +138,34 @@ export function computeDashboard(
     };
   });
 
-  // Officer-wise summary, grouped by Officer + Hearing Centre (matches DASHBOARD sheet's officer/venue rows)
-  const officerSummary: OfficerSummaryRow[] = OFFICER_VENUES.map((ov) => {
-    const matching = psDetails.filter(
-      (d) => d.officer === ov.Officer && d.hearingCentre === ov["Hearing Centre"]
-    );
-    return {
-      officer: ov.Officer,
-      officerMobile: toStr(ov["Officer Mobile"]),
-      hearingCentre: ov["Hearing Centre"],
-      noOfPs: matching.length,
-      totalScheduled: matching.reduce((s, m) => s + m.scheduledNotices, 0),
-      totalDelivered: matching.reduce((s, m) => s + m.noticeDelivered, 0),
-      totalPending: matching.reduce((s, m) => s + m.noticePendingDelivery, 0),
-      totalHearingsHeld: matching.reduce((s, m) => s + m.hearingsHeld, 0),
-    };
-  });
+  // Build the summary from the actual PS rows for the selected date.
+  // This prevents empty/stale Officer + Hearing Centre combinations from
+  // appearing as zero rows (the previous cause of the duplicate Parul Gupta row).
+  const summaryMap = new Map<string, OfficerSummaryRow>();
+  for (const d of psDetails) {
+    const key = `${d.officer}\u0000${d.hearingCentre}`;
+    const existing = summaryMap.get(key);
+    if (existing) {
+      existing.noOfPs += 1;
+      existing.totalScheduled += d.scheduledNotices;
+      existing.totalDelivered += d.noticeDelivered;
+      existing.totalPending += d.noticePendingDelivery;
+      existing.totalHearingsHeld += d.hearingsHeld;
+    } else {
+      summaryMap.set(key, {
+        officer: d.officer,
+        officerMobile: d.officerMobile,
+        hearingCentre: d.hearingCentre,
+        noOfPs: 1,
+        totalScheduled: d.scheduledNotices,
+        totalDelivered: d.noticeDelivered,
+        totalPending: d.noticePendingDelivery,
+        totalHearingsHeld: d.hearingsHeld,
+      });
+    }
+  }
+
+  const officerSummary = Array.from(summaryMap.values());
 
   const officerTotals: OfficerSummaryRow = {
     officer: "TOTAL",
@@ -91,7 +178,6 @@ export function computeDashboard(
     totalHearingsHeld: officerSummary.reduce((s, o) => s + o.totalHearingsHeld, 0),
   };
 
-  // Sort PS details: officer, then hearing centre, then PS No (matches sheet's grouped order via RankInDate)
   psDetails.sort((a, b) => {
     if (a.officer !== b.officer) return a.officer.localeCompare(b.officer);
     if (a.hearingCentre !== b.hearingCentre) return a.hearingCentre.localeCompare(b.hearingCentre);
