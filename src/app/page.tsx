@@ -27,9 +27,6 @@ function todayOrFirstDate(): string {
 
 export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string>(() => todayOrFirstDate());
-  // useSyncExternalStore safely reads localStorage: it renders the server
-  // snapshot (null) on first paint and switches to the real value right after,
-  // with no hydration-mismatch warning.
   const eciDataset = useSyncExternalStore(
     subscribeEciDataset,
     getEciDatasetSnapshot,
@@ -55,12 +52,12 @@ export default function Home() {
 
   return (
     <div className="flex-1 flex flex-col bg-paper">
-      <header className="bg-navy text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5">
-          <div className="text-xs uppercase tracking-wider text-white/60 mb-1">
+      <header className="bg-navy-dark text-white border-b border-border shadow-lg">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-7">
+          <div className="text-xs uppercase tracking-[0.18em] text-white/70 mb-2 font-medium">
             SIR 2026 · NCT of Delhi · South West District
           </div>
-          <h1 className="font-serif text-xl sm:text-2xl font-semibold">
+          <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-white tracking-tight">
             AC-34 Matiala — Hearing &amp; Notice Dashboard
           </h1>
         </div>
@@ -70,7 +67,7 @@ export default function Home() {
         <UploadPanel currentDataset={eciDataset} onLoaded={handleLoaded} />
 
         <section>
-          <h2 className="font-serif text-base font-semibold text-navy mb-2">
+          <h2 className="font-serif text-base font-semibold text-white mb-3">
             Hearing Date Chunein
           </h2>
           <DateSelector
