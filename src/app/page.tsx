@@ -5,6 +5,7 @@ import UploadPanel from "@/components/UploadPanel";
 import DateSelector from "@/components/DateSelector";
 import OfficerSummaryTable from "@/components/OfficerSummaryTable";
 import PsDetailTable from "@/components/PsDetailTable";
+import DownloadReportButton from "@/components/DownloadReportButton";
 import { computeDashboard, HEARING_DATES } from "@/lib/computeDashboard";
 import {
   getEciDatasetServerSnapshot,
@@ -67,9 +68,17 @@ export default function Home() {
         <UploadPanel currentDataset={eciDataset} onLoaded={handleLoaded} />
 
         <section>
-          <h2 className="font-serif text-base font-semibold text-white mb-3">
-            Hearing Date Chunein
-          </h2>
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+            <div>
+              <h2 className="font-serif text-base font-semibold text-white">
+                Hearing Date Chunein
+              </h2>
+              <p className="text-xs text-ink-soft mt-0.5">
+                Selected date ka officer-wise PS report download karein.
+              </p>
+            </div>
+            <DownloadReportButton selectedDate={selectedDate} rows={result.psDetails} />
+          </div>
           <DateSelector
             dates={HEARING_DATES}
             selected={selectedDate}
