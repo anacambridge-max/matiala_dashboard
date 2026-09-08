@@ -1,20 +1,22 @@
 import hearingDataRaw from "@/data/hearing_data.json";
-import listsRaw from "@/data/lists.json";
+import hearingScheduleRaw from "@/data/hearing_schedule.json";
+import psMasterRaw from "@/data/ps_master.json";
 import type {
   EciDataset,
   HearingDataRow,
   OfficerSummaryRow,
   PsDetailRow,
+  PsMasterRow,
 } from "./types";
 import { buildEciLookup } from "./eciParser";
 
 const hearingData = hearingDataRaw as unknown as HearingDataRow[];
-const lists = listsRaw as unknown as {
-  dates: string[];
-  officerVenues: { Officer: string; "Officer Mobile": number; "Hearing Centre": string }[];
-};
-
-export const HEARING_DATES = lists.dates;
+const hearingSchedule = hearingScheduleRaw as unknown as {
+  Date: string;
+  "PS No.": number;
+  "Scheduled Notices for Hearing": number;
+}[];
+const psMaster = psMasterRaw as unknown as PsMasterRow[];
 
 function toStr(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -26,7 +28,7 @@ function toStr(v: unknown): string {
  *
  * The PS-wise allocation is the source of truth for Officer + Hearing Centre.
  * This intentionally overrides stale/mistyped officer/centre values that may
- * exist in the schedule snapshot. In particular, PS 123 and PS 340 belong to
+ * exist in schedule snapshots. In particular, PS 123 and PS 340 belong to
  * SH. RAKESH KUMAR at GCSSC SEC-22 DWARKA(R), not SMT. PARUL GUPTA.
  */
 const AUTHORITATIVE_PS_ALLOCATION = [
@@ -93,6 +95,18 @@ function getAuthoritativeAssignment(psNo: number): AuthoritativeAssignment | nul
   return null;
 }
 
+const MASTER_BY_PS = new Map<number, PsMasterRow>();
+for (const row of psMaster) {
+  MASTER_BY_PS.set(row["PS No."], row);
+}
+
+// The uploaded Part-wise Hearing Summary is now the authoritative schedule.
+// Dates are derived from the uploaded schedule itself, so future dates added
+// to the sheet automatically appear in the dashboard without manual editing.
+export const HEARING_DATES = Array.from(
+  new Set(hearingSchedule.map((r) => r.Date))
+).sort();
+
 export interface DashboardResult {
   officerSummary: OfficerSummaryRow[];
   officerTotals: OfficerSummaryRow;
@@ -108,30 +122,33 @@ export function computeDashboard(
     ? buildEciLookup(eciDataset)
     : new Map<number, { delivered: number; held: number }>();
 
-  const rowsForDate = hearingData.filter((r) => r.Date === selectedDate);
+  const rowsForDate = hearingSchedule.filter((r) => r.Date === selectedDate);
 
   const psDetails: PsDetailRow[] = rowsForDate.map((r) => {
     const psNo = r["PS No."];
+    const master = MASTER_BY_PS.get(psNo) ?? hearingData.find((h) => h["PS No."] === psNo);
     const live = eciLookup.get(psNo);
-    const scheduled = r["Scheduled Notices for Hearing"] || 0;
+    const scheduled = Number(r["Scheduled Notices for Hearing"]) || 0;
     const delivered = live ? live.delivered : 0;
     const held = live ? live.held : 0;
-    const pending = scheduled - delivered;
+    // ECI Notice Delivered is a live PS-level value. Never show a negative
+    // pending count when that cumulative delivered value exceeds a particular
+    // date's scheduled hearing quantity.
+    const pending = Math.max(scheduled - delivered, 0);
     const assignment = getAuthoritativeAssignment(psNo);
 
     return {
-      // Always use the authoritative PS allocation when one exists.
-      officer: assignment?.officer ?? r.Officer,
-      officerMobile: assignment?.officerMobile ?? toStr(r["Officer Mobile"]),
-      hearingCentre: assignment?.hearingCentre ?? r["Hearing Centre"],
+      officer: assignment?.officer ?? master?.Officer ?? "",
+      officerMobile: assignment?.officerMobile ?? toStr(master?.["Officer Mobile"]),
+      hearingCentre: assignment?.hearingCentre ?? master?.["Hearing Centre"] ?? "",
       psNo,
-      oldPsNo: r["Old PS No."] ?? null,
-      blo: r.BLO ?? "",
-      bloMobile: toStr(r["BLO Mobile"]),
-      supervisor: r.Supervisor ?? "",
-      supervisorMobile: toStr(r["Supervisor Mobile"]),
+      oldPsNo: master?.["Old PS No."] ?? null,
+      blo: master?.BLO ?? "",
+      bloMobile: toStr(master?.["BLO Mobile"]),
+      supervisor: master?.Supervisor ?? "",
+      supervisorMobile: toStr(master?.["Supervisor Mobile"]),
       scheduledNotices: scheduled,
-      noticeGenerated: r["Notice Generated"] || 0,
+      noticeGenerated: scheduled,
       noticeDelivered: delivered,
       noticePendingDelivery: pending,
       hearingsHeld: held,
@@ -139,8 +156,8 @@ export function computeDashboard(
   });
 
   // Build the summary from the actual PS rows for the selected date.
-  // This prevents empty/stale Officer + Hearing Centre combinations from
-  // appearing as zero rows (the previous cause of the duplicate Parul Gupta row).
+  // This keeps each Officer + Hearing Centre combination separate, including
+  // Sh. Virender's two official hearing centres.
   const summaryMap = new Map<string, OfficerSummaryRow>();
   for (const d of psDetails) {
     const key = `${d.officer}\u0000${d.hearingCentre}`;
