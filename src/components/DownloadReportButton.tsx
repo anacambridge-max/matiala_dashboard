@@ -9,16 +9,49 @@ interface Props {
   rows: PsDetailRow[];
 }
 
+const OFFICER_ORDER = [
+  "SH. PARVEEN KUMAR",
+  "SH. RAKESH KUMAR",
+  "SH. SUBHASHISH",
+  "SH. VIRENDER",
+  "SMT. PARUL GUPTA",
+  "SMT. SHASHI BALA",
+];
+
+const CENTRE_ORDER = [
+  "GCSSS, SEC-3 DWARKA(P)",
+  "GCSSC SEC-22 DWARKA(R)",
+  "MCD Boys PRIMARY SCHOOL, QUTUB VIHAR",
+  "GCSSS SEC 22 DWARKA(V)",
+  "GGSSS GHUMANHERA",
+  "VREC MATIALA",
+  "GCSSS, SEC-3 DWARKA(S)",
+];
+
 export default function DownloadReportButton({ selectedDate, rows }: Props) {
   function downloadReport() {
     if (rows.length === 0) return;
 
+    const officerRank = (officer: string) => {
+      const index = OFFICER_ORDER.indexOf(officer);
+      return index === -1 ? OFFICER_ORDER.length : index;
+    };
+    const centreRank = (centre: string) => {
+      const index = CENTRE_ORDER.indexOf(centre);
+      return index === -1 ? CENTRE_ORDER.length : index;
+    };
+
+    // Keep the official dashboard officer order, then keep each officer's
+    // hearing centre together, and finally list PS numbers numerically.
     const sortedRows = [...rows].sort(
       (a, b) =>
-        a.officer.localeCompare(b.officer) ||
-        a.hearingCentre.localeCompare(b.hearingCentre) ||
+        officerRank(a.officer) - officerRank(b.officer) ||
+        centreRank(a.hearingCentre) - centreRank(b.hearingCentre) ||
         a.psNo - b.psNo
     );
+
+    const label = formatDateLabel(selectedDate);
+    const displayDate = `${label.day} ${label.date} ${label.month}`;
 
     const reportRows = sortedRows.map((r, index) => ({
       "S. No.": index + 1,
@@ -44,6 +77,8 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
       { wch: 11 }, { wch: 28 }, { wch: 15 }, { wch: 28 }, { wch: 17 },
       { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 14 },
     ];
+    worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+    worksheet["!autofilter"] = { ref: worksheet["!ref"] ?? "A1:O1" };
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "PS-wise Report");
