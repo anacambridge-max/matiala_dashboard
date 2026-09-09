@@ -29,14 +29,14 @@ const CENTRE_ORDER = [
 
 const PAGE_WIDTH = 842;
 const PAGE_HEIGHT = 595;
-const MARGIN = 28;
+const MARGIN = 24;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const ROW_HEIGHT = 17;
 const HEADER_HEIGHT = 20;
 const SECTION_HEIGHT = 31;
 const FOOTER_Y = 18;
 
-function ascii(value: string) {
+function ascii(value: string | number | null | undefined) {
   return String(value ?? "").replace(/[^\x20-\x7E]/g, "?");
 }
 
@@ -55,7 +55,7 @@ function textOp(
   return `${color} rg BT /${font} ${size} Tf ${x.toFixed(1)} ${y.toFixed(1)} Td (${pdfEscape(text)}) Tj ET`;
 }
 
-function fitText(value: string, maxChars: number) {
+function fitText(value: string | number | null | undefined, maxChars: number) {
   const clean = ascii(String(value ?? "").replace(/\s+/g, " ").trim());
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, Math.max(1, maxChars - 3))}...`;
@@ -80,7 +80,6 @@ function makePdf(pageStreams: string[]) {
     );
   });
 
-  // Keep the complete PDF ASCII-only so character offsets equal byte offsets.
   let pdf = "%PDF-1.4\n%PDF\n";
   const offsets: number[] = [0];
   objects.forEach((object, index) => {
@@ -121,17 +120,24 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
 
     const col = {
       sno: MARGIN,
-      officer: MARGIN + 29,
-      centre: MARGIN + 132,
-      ps: MARGIN + 307,
-      blo: MARGIN + 346,
-      supervisor: MARGIN + 454,
-      scheduled: MARGIN + 590,
-      delivered: MARGIN + 651,
-      pending: MARGIN + 713,
+      officer: MARGIN + 28,
+      centre: MARGIN + 94,
+      ps: MARGIN + 248,
+      blo: MARGIN + 278,
+      bloMobile: MARGIN + 348,
+      supervisor: MARGIN + 415,
+      supervisorMobile: MARGIN + 512,
+      scheduled: MARGIN + 610,
+      delivered: MARGIN + 675,
+      pending: MARGIN + 735,
     };
 
-    const buildPage = (pageRows: PsDetailRow[], pageNumber: number, totalPages: number, firstPage: boolean) => {
+    const buildPage = (
+      pageRows: PsDetailRow[],
+      pageNumber: number,
+      totalPages: number,
+      firstPage: boolean
+    ) => {
       const ops: string[] = [];
       let y = PAGE_HEIGHT - 32;
 
@@ -149,15 +155,18 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
       ops.push("0.12 0.17 0.23 rg");
       ops.push(`${MARGIN} ${headerY - HEADER_HEIGHT + 4} ${CONTENT_WIDTH} ${HEADER_HEIGHT} re f`);
       const hy = headerY - 14;
-      ops.push(textOp("S.No.", col.sno + 3, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("OFFICER", col.officer, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("HEARING CENTRE", col.centre, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("PS", col.ps, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("BLO", col.blo, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("SUPERVISOR", col.supervisor, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("SCHEDULED", col.scheduled, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("DELIVERED", col.delivered, hy, 7.5, "F2", "1 1 1"));
-      ops.push(textOp("PENDING DELIVERY", col.pending, hy, 7.5, "F2", "1 1 1"));
+      const headerSize = 6.3;
+      ops.push(textOp("S.No.", col.sno + 2, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("OFFICER", col.officer, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("HEARING CENTRE", col.centre, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("PS", col.ps, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("BLO", col.blo, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("BLO MOBILE", col.bloMobile, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("SUPERVISOR", col.supervisor, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("SUPERVISOR MOBILE", col.supervisorMobile, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("SCHEDULED", col.scheduled, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("DELIVERED", col.delivered, hy, headerSize, "F2", "1 1 1"));
+      ops.push(textOp("PENDING", col.pending, hy, headerSize, "F2", "1 1 1"));
       y = headerY - HEADER_HEIGHT;
 
       let previousOfficer = "";
@@ -182,16 +191,19 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
           ops.push("0.975 0.98 0.985 rg");
           ops.push(`${MARGIN} ${y - ROW_HEIGHT + 2} ${CONTENT_WIDTH} ${ROW_HEIGHT} re f`);
         }
-        ops.push(textOp(String(r.psNo), col.sno + 6, baseY, 8, "F1"));
-        ops.push(textOp(fitText(r.officer.replace(/^SH\. |^SMT\. /, ""), 18), col.officer, baseY, 7.2));
-        ops.push(textOp(fitText(r.hearingCentre, 28), col.centre, baseY, 7.2));
-        ops.push(textOp(String(r.psNo), col.ps, baseY, 8));
-        ops.push(textOp(fitText(r.blo, 18), col.blo, baseY, 7.2));
-        ops.push(textOp(fitText(r.supervisor, 21), col.supervisor, baseY, 7.2));
-        ops.push(textOp(String(r.scheduledNotices), col.scheduled + 10, baseY, 8, "F2"));
-        ops.push(textOp(String(r.noticeDelivered), col.delivered + 10, baseY, 8, "F2", "0.08 0.42 0.18"));
+
+        ops.push(textOp(String(r.psNo), col.sno + 4, baseY, 7.5, "F1"));
+        ops.push(textOp(fitText(r.officer.replace(/^SH\\. |^SMT\\. /, ""), 11), col.officer, baseY, 6.5));
+        ops.push(textOp(fitText(r.hearingCentre, 25), col.centre, baseY, 6.5));
+        ops.push(textOp(String(r.psNo), col.ps, baseY, 7.5));
+        ops.push(textOp(fitText(r.blo, 13), col.blo, baseY, 6.5));
+        ops.push(textOp(fitText(r.bloMobile, 12), col.bloMobile, baseY, 6.5));
+        ops.push(textOp(fitText(r.supervisor, 16), col.supervisor, baseY, 6.5));
+        ops.push(textOp(fitText(r.supervisorMobile, 12), col.supervisorMobile, baseY, 6.5));
+        ops.push(textOp(String(r.scheduledNotices), col.scheduled + 8, baseY, 7.5, "F2"));
+        ops.push(textOp(String(r.noticeDelivered), col.delivered + 8, baseY, 7.5, "F2", "0.08 0.42 0.18"));
         const pending = Number(r.noticePendingDelivery ?? 0);
-        ops.push(textOp(String(pending), col.pending + 10, baseY, 8.5, "F2", pending > 0 ? "0.72 0.08 0.08" : "0.18 0.45 0.22"));
+        ops.push(textOp(String(pending), col.pending + 8, baseY, 7.5, "F2", pending > 0 ? "0.72 0.08 0.08" : "0.18 0.45 0.22"));
         index += 1;
         y -= ROW_HEIGHT;
       }
@@ -202,15 +214,15 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
         ops.push(`${MARGIN} ${y - 23} ${CONTENT_WIDTH} 23 re f`);
         ops.push(textOp("TOTAL", MARGIN + 8, y - 16, 8.5, "F2", "1 1 1"));
         ops.push(textOp(String(sortedRows.length), col.ps, y - 16, 8.5, "F2", "1 1 1"));
-        ops.push(textOp(String(sortedRows.reduce((s, r) => s + Number(r.scheduledNotices ?? 0), 0)), col.scheduled + 10, y - 16, 8.5, "F2", "1 1 1"));
-        ops.push(textOp(String(sortedRows.reduce((s, r) => s + Number(r.noticeDelivered ?? 0), 0)), col.delivered + 10, y - 16, 8.5, "F2", "1 1 1"));
-        ops.push(textOp(String(sortedRows.reduce((s, r) => s + Number(r.noticePendingDelivery ?? 0), 0)), col.pending + 10, y - 16, 8.5, "F2", "1 1 1"));
+        ops.push(textOp(String(sortedRows.reduce((s, r) => s + Number(r.scheduledNotices ?? 0), 0)), col.scheduled + 8, y - 16, 8.5, "F2", "1 1 1"));
+        ops.push(textOp(String(sortedRows.reduce((s, r) => s + Number(r.noticeDelivered ?? 0), 0)), col.delivered + 8, y - 16, 8.5, "F2", "1 1 1"));
+        ops.push(textOp(String(sortedRows.reduce((s, r) => s + Number(r.noticePendingDelivery ?? 0), 0)), col.pending + 8, y - 16, 8.5, "F2", "1 1 1"));
       }
 
       ops.push("0.78 0.80 0.83 RG 0.6 w");
       ops.push(`${MARGIN} ${FOOTER_Y + 12} ${CONTENT_WIDTH} 0 l S`);
       ops.push(textOp("Pending Delivery = notices still awaiting delivery as reported by ECI", MARGIN, FOOTER_Y, 6.5, "F1", "0.35 0.38 0.42"));
-      ops.push(textOp(`Page ${pageNumber} of ${totalPages}`, PAGE_WIDTH - 90, FOOTER_Y, 6.5, "F1", "0.35 0.38 0.42"));
+      ops.push(textOp(`Page ${pageNumber} of ${totalPages}`, PAGE_WIDTH - 82, FOOTER_Y, 6.5, "F1", "0.35 0.38 0.42"));
       return ops.join("\n");
     };
 
@@ -232,14 +244,6 @@ export default function DownloadReportButton({ selectedDate, rows }: Props) {
       lastSection = section;
     }
     if (current.length) pages.push(current);
-
-    if (pages.length > 0) {
-      const final = pages[pages.length - 1];
-      if (final.length > 1 && final.length > 20) {
-        pages[pages.length - 1] = final.slice(0, -1);
-        pages.push(final.slice(-1));
-      }
-    }
 
     const totalPages = pages.length;
     const streams = pages.map((page, i) => buildPage(page, i + 1, totalPages, i === 0));
