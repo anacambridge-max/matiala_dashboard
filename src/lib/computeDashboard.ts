@@ -82,6 +82,51 @@ const ALL_SCHEDULE_ROWS = [
 
 export const HEARING_DATES = Array.from(new Set(ALL_SCHEDULE_ROWS.map((r) => r.date))).sort();
 
+/**
+ * ECI's "Notice Delivered" is cumulative at PS level, while the dashboard
+ * schedule is date-wise. Allocate cumulative deliveries to the earliest
+ * scheduled hearing dates first, so the same delivery is never repeated on
+ * every hearing date of the same PS.
+ *
+ * Example: dates 16 Sep = 100 and 25 Sep = 150.
+ * ECI delivered 10 => 16 Sep gets 10, 25 Sep gets 0.
+ * ECI delivered 120 => 16 Sep gets 100, 25 Sep gets 20.
+ */
+const SCHEDULE_BY_PS = new Map<number, Array<{ date: string; scheduled: number }>>();
+for (const row of ALL_SCHEDULE_ROWS) {
+  const existing = SCHEDULE_BY_PS.get(row.psNo) ?? [];
+  existing.push({ date: row.date, scheduled: row.scheduled });
+  SCHEDULE_BY_PS.set(row.psNo, existing);
+}
+
+const DATE_WISE_DELIVERED = new Map<string, number>();
+for (const [psNo, rows] of SCHEDULE_BY_PS) {
+  // Aggregate any accidental duplicate PS/date rows before allocation.
+  const byDate = new Map<string, number>();
+  for (const row of rows) {
+    byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.scheduled);
+  }
+  for (const [date, scheduled] of Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+    DATE_WISE_DELIVERED.set(`${psNo}\u0000${date}`, scheduled);
+  }
+}
+
+/** Apply one PS's cumulative ECI delivered value across its dates. */
+function allocateDeliveredForPs(psNo: number, cumulativeDelivered: number): void {
+  const rows = SCHEDULE_BY_PS.get(psNo) ?? [];
+  const byDate = new Map<string, number>();
+  for (const row of rows) {
+    byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.scheduled);
+  }
+
+  let remaining = Math.max(Number(cumulativeDelivered) || 0, 0);
+  for (const [date, scheduled] of Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+    const allocated = Math.min(scheduled, remaining);
+    DATE_WISE_DELIVERED.set(`${psNo}\u0000${date}`, allocated);
+    remaining -= allocated;
+  }
+}
+
 export interface DashboardResult {
   officerSummary: OfficerSummaryRow[];
   officerTotals: OfficerSummaryRow;
@@ -91,6 +136,12 @@ export interface DashboardResult {
 
 export function computeDashboard(selectedDate: string, eciDataset: EciDataset | null): DashboardResult {
   const eciLookup = eciDataset ? buildEciLookup(eciDataset) : new Map<number, { delivered: number; held: number }>();
+
+  // Recalculate date-wise allocation from the latest uploaded ECI cumulative values.
+  for (const [psNo, live] of eciLookup) {
+    allocateDeliveredForPs(psNo, live.delivered);
+  }
+
   const rowsForDate = ALL_SCHEDULE_ROWS.filter((r) => r.date === selectedDate);
 
   const psDetails: PsDetailRow[] = rowsForDate.map((r) => {
@@ -98,7 +149,7 @@ export function computeDashboard(selectedDate: string, eciDataset: EciDataset | 
     const master = MASTER_BY_PS.get(psNo);
     const live = eciLookup.get(psNo);
     const scheduled = r.scheduled;
-    const delivered = live ? live.delivered : 0;
+    const delivered = DATE_WISE_DELIVERED.get(`${psNo}\u0000${selectedDate}`) ?? 0;
     const held = live ? live.held : 0;
     const pending = Math.max(scheduled - delivered, 0);
     const assignment = getAuthoritativeAssignment(psNo);
