@@ -17,31 +17,73 @@ function toStr(v: unknown): string {
   return String(v).replace(/\.0$/, "");
 }
 
+/**
+ * Latest Part Wise Hearing Summary update.
+ * The uploaded report has 431 schedule rows (excluding Grand Total).
+ * Most rows are already present in hearing_data.json; this patch covers
+ * the rows added/removed/changed by the latest report, while the complete
+ * October schedule below is kept here because the base hearing data does
+ * not contain the October schedule rows.
+ */
+const SCHEDULE_PATCHES: Array<{ psNo: number; date: string; scheduled: number | null }> = [
+  { psNo: 1, date: "2026-09-07", scheduled: 1 },
+  { psNo: 1, date: "2026-09-08", scheduled: 63 },
+  { psNo: 1, date: "2026-09-17", scheduled: 1 },
+  { psNo: 39, date: "2026-09-12", scheduled: null },
+];
+
 const OCTOBER_SCHEDULE = [
-  { psNo: 28, date: "2026-10-06", scheduled: 163 },
   { psNo: 38, date: "2026-10-01", scheduled: 85 },
   { psNo: 41, date: "2026-10-01", scheduled: 100 },
-  { psNo: 56, date: "2026-10-03", scheduled: 150 },
-  { psNo: 57, date: "2026-10-03", scheduled: 136 },
   { psNo: 60, date: "2026-10-01", scheduled: 100 },
   { psNo: 82, date: "2026-10-01", scheduled: 81 },
-  { psNo: 91, date: "2026-10-05", scheduled: 152 },
-  { psNo: 92, date: "2026-10-05", scheduled: 172 },
-  { psNo: 93, date: "2026-10-03", scheduled: 100 },
-  { psNo: 93, date: "2026-10-06", scheduled: 116 },
-  { psNo: 95, date: "2026-10-06", scheduled: 102 },
-  { psNo: 238, date: "2026-10-05", scheduled: 104 },
-  { psNo: 247, date: "2026-10-03", scheduled: 50 },
+  { psNo: 134, date: "2026-10-01", scheduled: 126 },
   { psNo: 250, date: "2026-10-01", scheduled: 100 },
   { psNo: 263, date: "2026-10-01", scheduled: 100 },
-  { psNo: 263, date: "2026-10-05", scheduled: 83 },
-  { psNo: 271, date: "2026-10-03", scheduled: 79 },
   { psNo: 296, date: "2026-10-01", scheduled: 150 },
-  { psNo: 296, date: "2026-10-05", scheduled: 80 },
+  { psNo: 347, date: "2026-10-01", scheduled: 119 },
+  { psNo: 56, date: "2026-10-03", scheduled: 150 },
+  { psNo: 57, date: "2026-10-03", scheduled: 136 },
+  { psNo: 93, date: "2026-10-03", scheduled: 100 },
+  { psNo: 247, date: "2026-10-03", scheduled: 50 },
+  { psNo: 271, date: "2026-10-03", scheduled: 79 },
   { psNo: 303, date: "2026-10-03", scheduled: 61 },
-  { psNo: 327, date: "2026-10-05", scheduled: 80 },
   { psNo: 329, date: "2026-10-03", scheduled: 98 },
+  { psNo: 91, date: "2026-10-05", scheduled: 152 },
+  { psNo: 92, date: "2026-10-05", scheduled: 172 },
+  { psNo: 238, date: "2026-10-05", scheduled: 104 },
+  { psNo: 263, date: "2026-10-05", scheduled: 83 },
+  { psNo: 296, date: "2026-10-05", scheduled: 80 },
+  { psNo: 327, date: "2026-10-05", scheduled: 80 },
+  { psNo: 28, date: "2026-10-06", scheduled: 150 },
+  { psNo: 93, date: "2026-10-06", scheduled: 116 },
+  { psNo: 95, date: "2026-10-06", scheduled: 102 },
+  { psNo: 372, date: "2026-10-06", scheduled: 147 },
+  { psNo: 373, date: "2026-10-06", scheduled: 50 },
+  { psNo: 374, date: "2026-10-06", scheduled: 106 },
+  { psNo: 5, date: "2026-10-07", scheduled: 146 },
+  { psNo: 372, date: "2026-10-08", scheduled: 147 },
+  { psNo: 373, date: "2026-10-08", scheduled: 62 },
+  { psNo: 374, date: "2026-10-08", scheduled: 104 },
+  { psNo: 28, date: "2026-10-16", scheduled: 13 },
 ] as const;
+
+const PATCH_KEYS = new Set(SCHEDULE_PATCHES.map((r) => `${r.psNo}\u0000${r.date}`));
+const OCTOBER_KEYS = new Set(OCTOBER_SCHEDULE.map((r) => `${r.psNo}\u0000${r.date}`));
+
+const BASE_SCHEDULE_ROWS = hearingData
+  .map((r) => ({ psNo: r["PS No."], date: r.Date, scheduled: Number(r["Scheduled Notices for Hearing"]) || 0 }))
+  .filter((r) => !PATCH_KEYS.has(`${r.psNo}\u0000${r.date}`) && !OCTOBER_KEYS.has(`${r.psNo}\u0000${r.date}`));
+
+const ALL_SCHEDULE_ROWS = [
+  ...BASE_SCHEDULE_ROWS,
+  ...SCHEDULE_PATCHES
+    .filter((r) => r.scheduled !== null)
+    .map((r) => ({ psNo: r.psNo, date: r.date, scheduled: r.scheduled as number })),
+  ...OCTOBER_SCHEDULE,
+];
+
+export const HEARING_DATES = Array.from(new Set(ALL_SCHEDULE_ROWS.map((r) => r.date))).sort();
 
 const AUTHORITATIVE_PS_ALLOCATION = [
   { officer: "SH. PARVEEN KUMAR", officerMobile: "9953601073", hearingCentre: "GCSSS, SEC-3 DWARKA(P)", ranges: [[1, 50], [55, 60], [78, 79], [91, 96]] },
@@ -67,18 +109,10 @@ function getAuthoritativeAssignment(psNo: number): AuthoritativeAssignment | nul
 const MASTER_BY_PS = new Map<number, PsMasterRow>();
 for (const row of psMaster) MASTER_BY_PS.set(row["PS No."], row);
 
-const ALL_SCHEDULE_ROWS = [
-  ...hearingData.map((r) => ({ psNo: r["PS No."], date: r.Date, scheduled: Number(r["Scheduled Notices for Hearing"]) || 0 })),
-  ...OCTOBER_SCHEDULE,
-];
-
-export const HEARING_DATES = Array.from(new Set(ALL_SCHEDULE_ROWS.map((r) => r.date))).sort();
-
 /**
- * ECI's Notice Delivered is cumulative at PS level. The hearing schedule is
- * date-wise, so cumulative deliveries are consumed chronologically: the
- * earliest hearing date is filled first, then the next date, and so on.
- * This prevents the same delivered notices from appearing on every date.
+ * ECI's Notice Delivered is cumulative at PS level. Consume it chronologically
+ * across all hearing dates for that PS, so delivered notices are never counted
+ * again on a later hearing date until earlier scheduled notices are filled.
  */
 const SCHEDULE_BY_PS = new Map<number, Array<{ date: string; scheduled: number }>>();
 for (const row of ALL_SCHEDULE_ROWS) {
@@ -90,10 +124,7 @@ for (const row of ALL_SCHEDULE_ROWS) {
 const DATE_WISE_DELIVERED = new Map<string, number>();
 for (const [psNo, rows] of SCHEDULE_BY_PS) {
   const byDate = new Map<string, number>();
-  for (const row of rows) {
-    byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.scheduled);
-  }
-  // Default is zero until an ECI cumulative delivery value is available.
+  for (const row of rows) byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.scheduled);
   for (const [date] of Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b))) {
     DATE_WISE_DELIVERED.set(`${psNo}\u0000${date}`, 0);
   }
@@ -102,9 +133,7 @@ for (const [psNo, rows] of SCHEDULE_BY_PS) {
 function allocateDeliveredForPs(psNo: number, cumulativeDelivered: number): void {
   const rows = SCHEDULE_BY_PS.get(psNo) ?? [];
   const byDate = new Map<string, number>();
-  for (const row of rows) {
-    byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.scheduled);
-  }
+  for (const row of rows) byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.scheduled);
 
   let remaining = Math.max(Number(cumulativeDelivered) || 0, 0);
   for (const [date, scheduled] of Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b))) {
@@ -124,9 +153,7 @@ export interface DashboardResult {
 export function computeDashboard(selectedDate: string, eciDataset: EciDataset | null): DashboardResult {
   const eciLookup = eciDataset ? buildEciLookup(eciDataset) : new Map<number, { delivered: number; held: number }>();
 
-  for (const [psNo, live] of eciLookup) {
-    allocateDeliveredForPs(psNo, live.delivered);
-  }
+  for (const [psNo, live] of eciLookup) allocateDeliveredForPs(psNo, live.delivered);
 
   const rowsForDate = ALL_SCHEDULE_ROWS.filter((r) => r.date === selectedDate);
 
